@@ -29,6 +29,9 @@ int             xsize, ysize;
 int				thresh = 100;
 int             count = 0;
 
+/* the matrices in relation to the two markers */
+double  wmat1[3][4], wmat2[3][4];
+
 /* set up the video format globals */
 
 #ifdef _WIN32
@@ -45,6 +48,7 @@ static void   cleanup(void);
 static void   keyEvent( unsigned char key, int x, int y);
 static void   mainLoop(void);
 static int draw( ObjectData_T *object, int objectnum );
+static void drawTwoObjects(double gl_para1[16], double gl_para2[16]);
 static int  draw_object( int obj_id, double gl_para[16] );
 
 int main(int argc, char **argv)
@@ -173,7 +177,7 @@ static void init( void )
     printf("Objectfile num = %d\n", objectnum);
 
     /* open the graphics window */
-    argInit( &cparam, 2.0, 0, 0, 0, 0 );
+    argInit( &cparam, 1.0, 0, 0, 0, 0 );
 }
 
 /* cleanup function called when program exits */
@@ -188,8 +192,15 @@ static void cleanup(void)
 static int draw( ObjectData_T *object, int objectnum )
 {
     int     i;
-    double  gl_para[16];
+    double  gl_para1[16], gl_para2[16]; // the parameters for the two markers
        
+	if (!(object[0].visible && object[1].visible))
+		return 0;
+	else {
+        arUtilMatInv(object[0].trans, wmat1);
+        arUtilMatMul(wmat1, object[1].trans, wmat2);
+	}
+
 	glClearDepth( 1.0 );
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -197,17 +208,74 @@ static int draw( ObjectData_T *object, int objectnum )
     glEnable(GL_LIGHTING);
 
     /* calculate the viewing parameters - gl_para */
-    for( i = 0; i < objectnum; i++ ) {
+	argConvGlpara(object[0].trans, gl_para1);
+	argConvGlpara(object[1].trans, gl_para2);
+
+    /*for( i = 0; i < objectnum; i++ ) {
         if( object[i].visible == 0 ) continue;
         argConvGlpara(object[i].trans, gl_para);
         draw_object( object[i].id, gl_para);
-    }
+    }*/
+
+	// draw the two objects
+	drawTwoObjects(gl_para1, gl_para2);
      
 	glDisable( GL_LIGHTING );
     glDisable( GL_DEPTH_TEST );
 	
     return(0);
 }
+
+/* NEW DRAW function */
+static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
+	GLfloat   mat_ambient[]				= {0.0, 0.0, 1.0, 1.0};
+	GLfloat   mat_ambient_collide[]     = {1.0, 0.0, 0.0, 1.0};
+    GLfloat   mat_flash[]				= {0.0, 0.0, 1.0, 1.0};
+	GLfloat   mat_flash_collide[]       = {1.0, 0.0, 0.0, 1.0};
+    GLfloat   mat_flash_shiny[] = {50.0};
+    GLfloat   light_position[]  = {100.0,-200.0,200.0,0.0};
+    GLfloat   ambi[]            = {0.1, 0.1, 0.1, 0.1};
+    GLfloat   lightZeroColor[]  = {0.9, 0.9, 0.9, 0.1};
+ 
+    argDrawMode3D();
+    argDraw3dCamera( 0, 0 );
+    glMatrixMode(GL_MODELVIEW);
+
+	// First object
+	glLoadIdentity();
+    glLoadMatrixd( gl_para1 );
+
+ 	/* set the material */
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+    glLightfv(GL_LIGHT0, GL_AMBIENT, ambi);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightZeroColor);
+
+    glMaterialfv(GL_FRONT, GL_SHININESS, mat_flash_shiny);	
+
+	glColor3f(1.0, 0.0, 0.0);
+
+	glDisable(GL_LIGHTING);
+	glBegin(GL_LINES);
+		glVertex3f(0.0, 4, 30.0);
+		//glLoadMatrixd(gl_para2);
+		glVertex3f(wmat2[0][3], wmat2[1][3], wmat2[2][3]);
+	glEnd();
+	//glTranslatef(0.0, 0.0, 30.0);
+	//glutSolidSphere(30,12,6);
+
+	// Second object
+	glEnable(GL_LIGHTING);
+	glLoadIdentity();
+    glLoadMatrixd( gl_para2 );
+	glTranslatef(0.0, 0.0, 30.0);
+	glutSolidCube(50.0);
+
+
+	argDrawMode2D();
+}
+
 
 /* draw the user object */
 static int  draw_object( int obj_id, double gl_para[16])
