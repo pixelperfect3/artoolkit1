@@ -12,6 +12,8 @@
 #include <string.h>
 #include <math.h>
 
+#include <iostream>
+
 #ifndef __APPLE__
 #  include <GL/glut.h>
 #else
@@ -26,6 +28,8 @@
 
 // the simple geometry library
 #include <sg.h>
+
+using namespace std;
 
 #define COLLIDE_DIST 30000.0
 
@@ -42,8 +46,11 @@ int             count = 0;
 double  wmat1[3][4], wmat2[3][4];
 
 /* the mass-spring model setup */
+bool first = true; // is it being detected for the first time?
+bool setup = false; // have they been setup?
+
 /* Setup the particles */
-const int numParticles = 4;
+const int numParticles = 5;
 sgParticle *particles[numParticles];
 sgParticle *prevParticles[numParticles]; // the previous positions
 
@@ -52,7 +59,12 @@ bool prev = false;
 
 /* The spring dampers */
 const int numDampers = numParticles - 1;
-sgSpringDamper* *sprDampers[numDampers];
+sgSpringDamper *sprDampers[numDampers];
+
+/* The spring values */
+float _stiffness = 0.5;
+float _damping = 0.5;
+float _restLength = -1.0;
 
 /* set up the video format globals */
 
@@ -226,6 +238,47 @@ static int draw( ObjectData_T *object, int objectnum )
         arUtilMatMul(wmat1, object[1].trans, wmat2);
 	}
 
+	// If detected for the first time, setup the "cloth"
+	if (first) {
+		// setup left first?
+		sgVec3 sgv1 = {0.0, 0.0, 30.0};
+		sgVec3 sgv2 = {wmat2[0][3], wmat2[1][3], wmat2[2][3]};
+
+		particles[0] = new sgParticle(1.0, 0.0, 0.0, 30.0);
+		particles[numParticles - 1] = new sgParticle(1.0, sgv2);
+		particles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
+		particles[2] = new sgParticle(1.0, (wmat2[0][3]*2)/numParticles, (wmat2[1][3]*2)/numParticles, (wmat2[2][3]*2)/numParticles);
+		particles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);
+
+		// now the spring dampers
+		for (int i = 0; i < numDampers; i++) 
+			sprDampers[i] = new sgSpringDamper(particles[i], particles[i+1], _stiffness, _damping, _restLength);
+
+		first = false;
+		setup = true;
+
+		cout << "Finished 1st setup " << endl;
+	}
+	else { // just update the position of the end two
+		particles[0] = new sgParticle(1.0, 0.0, 0.0, 30.0);
+		particles[numParticles-1] = new sgParticle(1.0, wmat2[0][3], wmat2[1][3], wmat2[2][3]);
+
+		sgVec3 sgv1 = {0.0, 0.0, 30.0};
+		sgVec3 sgv2 = {wmat2[0][3], wmat2[1][3], wmat2[2][3]};
+
+		particles[0] = new sgParticle(1.0, 0.0, 0.0, 30.0);
+		particles[numParticles - 1] = new sgParticle(1.0, sgv2);
+		particles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
+		particles[2] = new sgParticle(1.0, (wmat2[0][3]*2)/numParticles, (wmat2[1][3]*2)/numParticles, (wmat2[2][3]*2)/numParticles);
+		particles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);
+
+		// now the spring dampers
+		for (int i = 0; i < numDampers; i++) 
+			sprDampers[i] = new sgSpringDamper(particles[i], particles[i+1], _stiffness, _damping, _restLength);
+
+		cout << "Finished 2nd setup " << endl;
+	}
+
 	glClearDepth( 1.0 );
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -253,6 +306,9 @@ static int draw( ObjectData_T *object, int objectnum )
 
 /* NEW DRAW function */
 static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
+	if (!setup)
+		return;
+
 	GLfloat   mat_ambient[]				= {0.0, 0.0, 1.0, 1.0};
 	GLfloat   mat_ambient_collide[]     = {1.0, 0.0, 0.0, 1.0};
     GLfloat   mat_flash[]				= {0.0, 0.0, 1.0, 1.0};
@@ -281,12 +337,39 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
 
 	glColor3f(1.0, 0.0, 0.0);
 
+	// apply the forces
+	for (int i = 0; i < numParticles; i++)
+		//if (i != 0 && i != numParticles-1)
+			//particles[i]->setForce(0.0, -0.1, 0.0);
+		//else
+			particles[i]->zeroForce();
+
+	cout << "Applied forces" << endl;
+
+	// update the spring dampers
+	for (int i = 0; i < numDampers; i++)
+		sprDampers[i]->update();
+
+	cout << "Applied damper updates" << endl;
+
+	// update the particles
+	for (int i = 0; i < numParticles; i++)
+		if (i != 0 && i != numParticles-1)
+			particles[i]->update(0.05);
+
+	cout << "Updated particles" << endl;
+
+	// draw the lines
 	glDisable(GL_LIGHTING);
-	glBegin(GL_LINES);
-		glVertex3f(0.0, 4, 30.0);
-		//glLoadMatrixd(gl_para2);
-		glVertex3f(wmat2[0][3], wmat2[1][3], wmat2[2][3]);
+	glBegin(GL_LINE_STRIP);
+		for (int i = 0; i < numParticles-1; i++) {
+			glVertex3fv(particles[i]->getPos());
+			//glLoadMatrixd(gl_para2);
+			glVertex3fv(particles[i+1]->getPos());
+		}
 	glEnd();
+
+	cout << "drew lines" << endl;
 	//glTranslatef(0.0, 0.0, 30.0);
 	//glutSolidSphere(30,12,6);
 
@@ -295,7 +378,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
 	glLoadIdentity();
     glLoadMatrixd( gl_para2 );
 	glTranslatef(0.0, 0.0, 30.0);
-	glutSolidCube(50.0);
+	//glutSolidCube(50.0);
 
 
 	argDrawMode2D();
