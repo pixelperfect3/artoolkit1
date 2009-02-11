@@ -29,7 +29,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/DEBUG"
-				AdditionalDependencies="libARd.lib libARgsubd.lib libARvideod.lib opengl32.lib glu32.lib glut32.lib"
+				AdditionalDependencies="libARd.lib libARgsubd.lib libARvideod.lib opengl32.lib glu32.lib glut32.lib sg_d.lib ul_d.lib sl_d.lib ssg_d.lib ssgAux_d.lib js_d.lib pui_d.lib psl_d.lib"
 				OutputFile="$(ProjectDir)..\..\bin\$(ProjectName)d.exe"
 				AdditionalLibraryDirectories="&quot;$(ProjectDir)..\..\lib&quot;"
 				GenerateDebugInformation="TRUE"/>
@@ -109,13 +109,25 @@
 	</References>
 	<Files>
 		<File
-			RelativePath="loadMultiple.c">
-		</File>
-		<File
-			RelativePath="object.c">
+			RelativePath=".\object.cpp">
+			<FileConfiguration
+				Name="Debug|Win32">
+				<Tool
+					Name="VCCLCompilerTool"
+					ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+			</FileConfiguration>
+			<FileConfiguration
+				Name="Release|Win32">
+				<Tool
+					Name="VCCLCompilerTool"
+					ObjectFile="$(IntDir)/$(InputName)1.obj"/>
+			</FileConfiguration>
 		</File>
 		<File
 			RelativePath="object.h">
+		</File>
+		<File
+			RelativePath=".\Project1.cpp">
 		</File>
 	</Files>
 	<Globals>
