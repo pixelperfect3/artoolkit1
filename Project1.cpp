@@ -25,7 +25,7 @@
 #include "object.h"
 
 // the simple geometry library
-//#include <sg.h>
+#include <sg.h>
 
 #define COLLIDE_DIST 30000.0
 
@@ -44,8 +44,15 @@ double  wmat1[3][4], wmat2[3][4];
 /* the mass-spring model setup */
 /* Setup the particles */
 const int numParticles = 4;
-//sgParticle *particles[numParticles];
+sgParticle *particles[numParticles];
+sgParticle *prevParticles[numParticles]; // the previous positions
 
+// does previous exist or not?
+bool prev = false;
+
+/* The spring dampers */
+const int numDampers = numParticles - 1;
+sgSpringDamper* *sprDampers[numDampers];
 
 /* set up the video format globals */
 
@@ -193,6 +200,9 @@ static void init( void )
 
     /* open the graphics window */
     argInit( &cparam, 1.0, 0, 0, 0, 0 );
+
+	/* initialize the particles */
+
 }
 
 /* cleanup function called when program exits */
