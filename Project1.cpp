@@ -54,6 +54,9 @@ const int numParticles = 5;
 sgParticle *particles[numParticles];
 sgParticle *prevParticles[numParticles]; // the previous positions
 
+// prev positions
+double prev1[3][4], prev2[3][4];
+
 // does previous exist or not?
 bool prev = false;
 
@@ -62,9 +65,11 @@ const int numDampers = numParticles - 1;
 sgSpringDamper *sprDampers[numDampers];
 
 /* The spring values */
-float _stiffness = 0.5;
-float _damping = 0.5;
+float _stiffness = 0.9;
+float _damping = 0.4;
 float _restLength = -1.0;
+
+int _scene = 1; // 0: lying flat. 1: vertical 
 
 /* set up the video format globals */
 
@@ -231,28 +236,44 @@ static int draw( ObjectData_T *object, int objectnum )
     int     i;
     double  gl_para1[16], gl_para2[16]; // the parameters for the two markers
        
+	double      cam_trans1[3][4], cam_trans2[3][4];
 	if (!(object[0].visible && object[1].visible))
 		return 0;
 	else {
         arUtilMatInv(object[0].trans, wmat1);
         arUtilMatMul(wmat1, object[1].trans, wmat2);
+
+		arUtilMatInv(object[0].trans, cam_trans1);
+		arUtilMatInv(object[1].trans, cam_trans2);
 	}
 
 	// If detected for the first time, setup the "cloth"
 	if (first) {
 		// setup left first?
-		sgVec3 sgv1 = {0.0, 0.0, 30.0};
+		sgVec3 sgv1 = {0.0, 0.0, 0.0};
 		sgVec3 sgv2 = {wmat2[0][3], wmat2[1][3], wmat2[2][3]};
 
-		particles[0] = new sgParticle(1.0, 0.0, 0.0, 30.0);
+		particles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
 		particles[numParticles - 1] = new sgParticle(1.0, sgv2);
 		particles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
 		particles[2] = new sgParticle(1.0, (wmat2[0][3]*2)/numParticles, (wmat2[1][3]*2)/numParticles, (wmat2[2][3]*2)/numParticles);
 		particles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);
 
+		prevParticles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
+		prevParticles[numParticles - 1] = new sgParticle(1.0, sgv2);
+		prevParticles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
+		prevParticles[2] = new sgParticle(1.0, (wmat2[0][3]*2)/numParticles, (wmat2[1][3]*2)/numParticles, (wmat2[2][3]*2)/numParticles);
+		prevParticles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);
+
 		// now the spring dampers
 		for (int i = 0; i < numDampers; i++) 
 			sprDampers[i] = new sgSpringDamper(particles[i], particles[i+1], _stiffness, _damping, _restLength);
+
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 4; j++) {
+				prev1[i][j] = cam_trans1[i][j];
+				prev2[i][j] = cam_trans2[i][j];
+			}
 
 		first = false;
 		setup = true;
@@ -260,13 +281,27 @@ static int draw( ObjectData_T *object, int objectnum )
 		cout << "Finished 1st setup " << endl;
 	}
 	else { // just update the position of the end two
-		particles[0] = new sgParticle(1.0, 0.0, 0.0, 30.0);
+		// prev position
+		prevParticles[0]->setPos(particles[0]->getPos());
+		prevParticles[numParticles - 1]->setPos(particles[numParticles-1]->getPos());
+
+		// new position
+		particles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
 		particles[numParticles-1] = new sgParticle(1.0, wmat2[0][3], wmat2[1][3], wmat2[2][3]);
 
-		sgVec3 sgv1 = {0.0, 0.0, 30.0};
+		particles[0]->setForce(cam_trans1[0][3]-prev1[0][3], cam_trans1[1][3]-prev1[1][3], cam_trans1[2][3]-prev1[2][3]);
+		particles[numParticles-1]->setForce(cam_trans2[0][3]-prev2[0][3], cam_trans2[1][3]-prev2[1][3], cam_trans2[2][3]-prev2[2][3]);
+		sgVec3 sgv1 = {0.0, 0.0, 0.0};
 		sgVec3 sgv2 = {wmat2[0][3], wmat2[1][3], wmat2[2][3]};
 
-		particles[0] = new sgParticle(1.0, 0.0, 0.0, 30.0);
+		// update the previous
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 4; j++) {
+				prev1[i][j] = cam_trans1[i][j];
+				prev2[i][j] = cam_trans2[i][j];
+			}
+
+		/*particles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
 		particles[numParticles - 1] = new sgParticle(1.0, sgv2);
 		particles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
 		particles[2] = new sgParticle(1.0, (wmat2[0][3]*2)/numParticles, (wmat2[1][3]*2)/numParticles, (wmat2[2][3]*2)/numParticles);
@@ -274,7 +309,7 @@ static int draw( ObjectData_T *object, int objectnum )
 
 		// now the spring dampers
 		for (int i = 0; i < numDampers; i++) 
-			sprDampers[i] = new sgSpringDamper(particles[i], particles[i+1], _stiffness, _damping, _restLength);
+			sprDampers[i] = new sgSpringDamper(particles[i], particles[i+1], _stiffness, _damping, _restLength);*/
 
 		cout << "Finished 2nd setup " << endl;
 	}
@@ -321,6 +356,15 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
     argDrawMode3D();
     argDraw3dCamera( 0, 0 );
     glMatrixMode(GL_MODELVIEW);
+	
+	// Draw object in top left
+	glLoadIdentity();
+	glBegin(GL_QUADS);
+		glVertex3f(0.0, 4.0, 0.0);
+		glVertex3f(4.0, 4.0, 0.0);
+		glVertex3f(4.0, 0.0, 0.0);
+		glVertex3f(0.0, 0.0, 0.0);
+	glEnd();
 
 	// First object
 	glLoadIdentity();
@@ -339,28 +383,57 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
 
 	// apply the forces
 	for (int i = 0; i < numParticles; i++)
-		//if (i != 0 && i != numParticles-1)
-			//particles[i]->setForce(0.0, -0.1, 0.0);
-		//else
-			particles[i]->zeroForce();
+		if (i != 0 && i != numParticles-1) {
+			if (_scene == 1)
+				particles[i]->setForce(0.0, -0.5, 0.0);
+			else
+				particles[i]->setForce(0.0, 0.0, -0.5);
+		}
+		else {
+			float xdir = particles[i]->getPos()[0] - prevParticles[i]->getPos()[0];
+			float ydir = particles[i]->getPos()[1] - prevParticles[i]->getPos()[1];
+			float zdir = particles[i]->getPos()[2] - prevParticles[i]->getPos()[2];
 
-	cout << "Applied forces" << endl;
+			//cout << "New force: " << xdir << " " << ydir << " " << zdir << endl;
+			//particles[i]->setForce(xdir, ydir, zdir);
+			if (i == 0)
+				particles[i]->setForce(-4.0, 0.0, 0.0);
+			else
+				particles[i]->setForce(0.0, -0.5, 0.0);
+
+		}
+
+	//cout << "Applied forces" << endl;
 
 	// update the spring dampers
 	for (int i = 0; i < numDampers; i++)
 		sprDampers[i]->update();
 
-	cout << "Applied damper updates" << endl;
+	//cout << "Applied damper updates" << endl;
 
 	// update the particles
 	for (int i = 0; i < numParticles; i++)
-		if (i != 0 && i != numParticles-1)
-			particles[i]->update(0.05);
+		//if (i != 0 && i != numParticles-1)
+			particles[i]->update(0.9);
 
-	cout << "Updated particles" << endl;
+	//cout << "Updated particles" << endl;
+
+	glDisable(GL_LIGHTING);
+	// draw the vertices
+	glPushMatrix();
+	//glScalef(20, 20, 20);
+	glColor3f(1.0, 0.0, 0.0);
+	glPointSize(20.0);
+	glBegin(GL_POINTS);
+		for (int i = 0; i < numParticles; i++) {
+			glVertex3fv(particles[i]->getPos());
+		}
+	glEnd();
+	glPopMatrix();
 
 	// draw the lines
 	glDisable(GL_LIGHTING);
+	glColor3f(1.0, 1.0, 1.0);
 	glBegin(GL_LINE_STRIP);
 		for (int i = 0; i < numParticles-1; i++) {
 			glVertex3fv(particles[i]->getPos());
