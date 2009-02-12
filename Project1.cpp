@@ -81,16 +81,18 @@ sgSpringDamper *sprDC2[2]; // column 2
 sgSpringDamper *sprDC3[3]; // column 3
 sgSpringDamper *sprDC4[4]; // column 4
 
+sgSpringDamper *sprDCD[4]; // diagonal
+
 //sgSpringDamper *sprDampersX[rows][columns-1];
 //sgSpringDamper *sprDampersY[rows-1][columns];
 
 /* The spring values */
-float _mass = 0.5;
+float _mass = 0.8;
 float _stiffness = 0.9;
 float _damping = 0.3;
 float _restLength = -1.0;
 float timeStep = 0.4;
-float downward = 0.5;
+float downward = 0.4;
 int _scene = 1; // 0: lying flat. 1: vertical 
 
 /* set up the video format globals */
@@ -354,6 +356,12 @@ static int draw( ObjectData_T *object, int objectnum )
 		sprDC4[2] = new sgSpringDamper(row3[2], row4[1], _stiffness, _damping, _restLength); // 4th
 		sprDC4[3] = new sgSpringDamper(row4[0], row5, _stiffness, _damping, _restLength); // 4th
 
+		// diagonal spring dampers
+		sprDCD[0] = new sgSpringDamper(row1[0], row2[0], _stiffness, _damping, _restLength); // 4th
+		sprDCD[1] = new sgSpringDamper(row2[0], row3[0], _stiffness, _damping, _restLength); // 4th
+		sprDCD[2] = new sgSpringDamper(row3[0], row4[0], _stiffness, _damping, _restLength); // 4th
+		sprDCD[3] = new sgSpringDamper(row4[0], row5, _stiffness, _damping, _restLength); // 4th
+
 		/*particles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
 		particles[numParticles - 1] = new sgParticle(1.0, sgv2);
 		particles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
@@ -521,6 +529,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
 	for (int i = 0; i < 4; i++) {
 		sprD1[i]->update();
 		sprDC4[i]->update();
+		sprDCD[i]->update();
 	}
 	for (int i = 0; i < 3; i++) {
 		sprD2[i]->update();
