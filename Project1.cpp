@@ -43,7 +43,7 @@ int				thresh = 100;
 int             count = 0;
 
 /* the matrices in relation to the two markers */
-double  wmat1[3][4], wmat2[3][4];
+double  wmat1[3][4], wmat2[3][4], wmat3[3][4];
 
 /* the mass-spring model setup */
 bool first = true; // is it being detected for the first time?
@@ -51,11 +51,19 @@ bool setup = false; // have they been setup?
 
 /* Setup the particles */
 const int numParticles = 5;
-sgParticle *particles[numParticles];
+const int rows = 5;
+const int columns = 5;
+//sgParticle *particles[numParticles];
+sgParticle *row1[5];
+sgParticle *row2[4];
+sgParticle *row3[3];
+sgParticle *row4[2];
+sgParticle *row5;
+
 sgParticle *prevParticles[numParticles]; // the previous positions
 
 // prev positions
-double prev1[3][4], prev2[3][4];
+double prev1[3][4], prev2[3][4], prev3[3][4];
 
 // does previous exist or not?
 bool prev = false;
@@ -63,10 +71,13 @@ bool prev = false;
 /* The spring dampers */
 const int numDampers = numParticles - 1;
 sgSpringDamper *sprDampers[numDampers];
+sgSpringDamper *sprDampersX[rows][columns-1];
+sgSpringDamper *sprDampersY[rows-1][columns];
 
 /* The spring values */
-float _stiffness = 0.9;
-float _damping = 0.4;
+float _mass = 0.1;
+float _stiffness = 0.99;
+float _damping = 0.2;
 float _restLength = -1.0;
 
 int _scene = 1; // 0: lying flat. 1: vertical 
@@ -236,15 +247,20 @@ static int draw( ObjectData_T *object, int objectnum )
     int     i;
     double  gl_para1[16], gl_para2[16]; // the parameters for the two markers
        
-	double      cam_trans1[3][4], cam_trans2[3][4];
-	if (!(object[0].visible && object[1].visible))
+	double      cam_trans1[3][4], cam_trans2[3][4], cam_trans3[3][4];
+	if (!(object[0].visible && object[1].visible && object[2].visible))
 		return 0;
 	else {
         arUtilMatInv(object[0].trans, wmat1);
+		// according to 2nd object
         arUtilMatMul(wmat1, object[1].trans, wmat2);
+
+		// according to 3rd object
+		arUtilMatMul(wmat1, object[2].trans, wmat3);
 
 		arUtilMatInv(object[0].trans, cam_trans1);
 		arUtilMatInv(object[1].trans, cam_trans2);
+		arUtilMatInv(object[2].trans, cam_trans3);
 	}
 
 	// If detected for the first time, setup the "cloth"
@@ -253,21 +269,53 @@ static int draw( ObjectData_T *object, int objectnum )
 		sgVec3 sgv1 = {0.0, 0.0, 0.0};
 		sgVec3 sgv2 = {wmat2[0][3], wmat2[1][3], wmat2[2][3]};
 
-		particles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
+		// 3rd vector (between 2nd and 3rd marker)
+		float x = wmat2[0][3] - wmat3[0][3];
+		float y = wmat2[1][3] - wmat3[1][3];
+		float z = wmat2[2][3] - wmat3[2][3];
+
+		// diagonal first
+		row1[0] = new sgParticle(_mass, 0.0, 0.0, 0.0);
+		row2[0] = new sgParticle(_mass, wmat2[0][3]*1/4, wmat2[1][3]*1/4, wmat2[2][3]*1/4);
+		row3[0] = new sgParticle(_mass, wmat2[0][3]*2/4, wmat2[1][3]*2/4, wmat2[2][3]*2/4);
+		row4[0] = new sgParticle(_mass, wmat2[0][3]*3/4, wmat2[1][3]*3/4, wmat2[2][3]*3/4);
+		row5 = new sgParticle(_mass, wmat2[0][3], wmat2[1][3], wmat2[2][3]);
+		
+		// right vertical
+		row1[4] = new sgParticle(_mass, wmat3[0][3], wmat3[1][3], wmat3[2][3]);
+		float avg23[3] = {wmat2[0][3] - wmat3[0][3], wmat2[1][3] - wmat3[1][3], wmat2[2][3] - wmat3[2][3]};
+		row2[3] = new sgParticle(_mass, wmat3[0][3] + (avg23[0]/4), wmat3[1][3] + (avg23[1]/5), wmat3[2][3] + (avg23[2]/4));
+		row3[2] = new sgParticle(_mass, wmat3[0][3] + (avg23[0]*2/4), wmat3[1][3] + (avg23[1]*2/4), wmat3[2][3] + (avg23[2]*2/4));
+		row4[1] = new sgParticle(_mass, wmat3[0][3] + (avg23[0]*3/4), wmat3[1][3] + (avg23[1]*3/4), wmat3[2][3] + (avg23[2]*3/4));
+		
+		// first row
+		row1[1] = new sgParticle(_mass, wmat3[0][3]*1/4, wmat3[1][3]*1.0/4, wmat3[2][3]*1.0/4);
+		row1[2] = new sgParticle(_mass, wmat3[0][3]*2.0/4, wmat3[1][3]*2.0/4, wmat3[2][3]*2.0/4);
+		row1[3] = new sgParticle(_mass, wmat3[0][3]*3.0/4, wmat3[1][3]*3.0/4, wmat3[2][3]*3.0/4);
+
+		// second row
+		row2[1] = new sgParticle(_mass, (row1[2]->getPos()[0] + row3[0]->getPos()[0])/2.0, (row1[2]->getPos()[1] + row3[0]->getPos()[1])/2.0, (row1[2]->getPos()[2] + row3[0]->getPos()[2])/2.0);
+
+		// 4th column middle
+		float avg24[3] = {row1[3]->getPos()[0] - row3[1]->getPos()[0], row1[3]->getPos()[1] - row3[1]->getPos()[1], row1[3]->getPos()[2] - row3[1]->getPos()[2]};
+		row2[2] = new sgParticle(_mass, row1[1]->getPos()[0] + (avg24[0]/3), row1[1]->getPos()[1] + (avg24[1]/3), row1[1]->getPos()[2] + (avg24[2]/3));
+		row3[1] = new sgParticle(_mass, row1[1]->getPos()[0] + (avg24[0]*2.0/3), row1[1]->getPos()[1] + (avg24[1]*2.0/3), row1[1]->getPos()[2] + (avg24[2]*2.0/3));
+
+		/*particles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
 		particles[numParticles - 1] = new sgParticle(1.0, sgv2);
 		particles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
 		particles[2] = new sgParticle(1.0, (wmat2[0][3]*2)/numParticles, (wmat2[1][3]*2)/numParticles, (wmat2[2][3]*2)/numParticles);
-		particles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);
+		particles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);*/
 
-		prevParticles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
+		/*prevParticles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
 		prevParticles[numParticles - 1] = new sgParticle(1.0, sgv2);
 		prevParticles[1] = new sgParticle(1.0, wmat2[0][3]/numParticles, wmat2[1][3]/numParticles, wmat2[2][3]/numParticles);
 		prevParticles[2] = new sgParticle(1.0, (wmat2[0][3]*2)/numParticles, (wmat2[1][3]*2)/numParticles, (wmat2[2][3]*2)/numParticles);
-		prevParticles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);
+		prevParticles[3] = new sgParticle(1.0, (wmat2[0][3]*3)/numParticles, (wmat2[1][3]*3)/numParticles, (wmat2[2][3]*3)/numParticles);*/
 
 		// now the spring dampers
-		for (int i = 0; i < numDampers; i++) 
-			sprDampers[i] = new sgSpringDamper(particles[i], particles[i+1], _stiffness, _damping, _restLength);
+		//for (int i = 0; i < numDampers; i++) 
+			//sprDampers[i] = new sgSpringDamper(particles[i], particles[i+1], _stiffness, _damping, _restLength);
 
 		for (int i = 0; i < 3; i++)
 			for (int j = 0; j < 4; j++) {
@@ -282,7 +330,7 @@ static int draw( ObjectData_T *object, int objectnum )
 	}
 	else { // just update the position of the end two
 		// prev position
-		prevParticles[0]->setPos(particles[0]->getPos());
+		/*prevParticles[0]->setPos(particles[0]->getPos());
 		prevParticles[numParticles - 1]->setPos(particles[numParticles-1]->getPos());
 
 		// new position
@@ -299,7 +347,7 @@ static int draw( ObjectData_T *object, int objectnum )
 			for (int j = 0; j < 4; j++) {
 				prev1[i][j] = cam_trans1[i][j];
 				prev2[i][j] = cam_trans2[i][j];
-			}
+			}*/
 
 		/*particles[0] = new sgParticle(1.0, 0.0, 0.0, 0.0);
 		particles[numParticles - 1] = new sgParticle(1.0, sgv2);
@@ -382,7 +430,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
 	glColor3f(1.0, 0.0, 0.0);
 
 	// apply the forces
-	for (int i = 0; i < numParticles; i++)
+	/*for (int i = 0; i < numParticles; i++)
 		if (i != 0 && i != numParticles-1) {
 			if (_scene == 1)
 				particles[i]->setForce(0.0, -0.5, 0.0);
@@ -440,7 +488,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16]) {
 			//glLoadMatrixd(gl_para2);
 			glVertex3fv(particles[i+1]->getPos());
 		}
-	glEnd();
+	glEnd();*/
 
 	cout << "drew lines" << endl;
 	//glTranslatef(0.0, 0.0, 30.0);
