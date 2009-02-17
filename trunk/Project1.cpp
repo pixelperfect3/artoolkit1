@@ -48,6 +48,11 @@ double prev1[3][4], prev2[3][4], prev3[3][4];
 
 // if something touched pos: [1,1]
 int touch = 0;
+int touch2 = 0;
+int touch3 = 0;
+int touch4 = 0;
+
+int time = 0;
 
 // the grids
 double cap[4][4][3];
@@ -347,7 +352,9 @@ static int draw( ObjectData_T *object, int objectnum )
 		//cout << "FINGER: " << wmat3[0][3] << " " <<  wmat3[1][3] << " " << wmat3[2][3] << endl;
 		//cout << "FINGER in relation to screen: " << (wmat3[0][3]-wmat1[0][3])/(wmat3[0][3]-wmat1[0][3]) << " " <<  (wmat3[1][3]-wmat1[1][3])/(wmat3[0][3]-wmat1[0][3]) << " " << (wmat3[2][3]-wmat1[2][3])/(wmat3[0][3]-wmat1[0][3]) << endl;
 		
-		findPos(paddlePos, object[2].trans, object[0].trans);// object[2].trans);
+		cout << "FINGER: " << object[2].trans[0][3] << " " << object[2].trans[1][3] << " " << object[2].trans[2][3] << endl;
+
+		//findPos(paddlePos, object[2].trans, object[0].trans);// object[2].trans);
 
 		float x1,y1,z1;
 		float x2,y2,z2;
@@ -362,8 +369,67 @@ static int draw( ObjectData_T *object, int objectnum )
 		z2 = object[2].trans[2][3];
 
 		dist = (x1-x2)*(x1-x2)+(y1-y2)*(y1-y2)+(z1-z2)*(z1-z2);
-		cout << "DISTANCE: " << dist << " " << object[0].marker_width << endl;
+
+		// try finding touch point - not for resistive though
+		if (y2 > 109 && z2 > 620 && !(_type == 'r')) { 
+			touch = true;
+			touch2 = false;
+		}
+		else if (y2 > 50 && z2 > 660 && !(_type == 'r')) {
+			touch = false; 
+			touch2 = true;
+		}
+			
+		//cout << "DISTANCE: " << dist << " " << object[0].marker_width << endl;
 	}
+	else {
+		touch = false;
+		touch2 = false;
+	}
+	
+	// if stylus and screen are visible
+	if (object[0].visible && object[3].visible) {
+		arUtilMatInv(object[0].trans, wmat1);
+		arUtilMatInv(object[3].trans, wmat3);
+		// according to 3rd object
+		arUtilMatMul(wmat1, object[3].trans, wmat3);
+
+		//cout << "FINGER: " << wmat3[0][3] << " " <<  wmat3[1][3] << " " << wmat3[2][3] << endl;
+		//cout << "FINGER in relation to screen: " << (wmat3[0][3]-wmat1[0][3])/(wmat3[0][3]-wmat1[0][3]) << " " <<  (wmat3[1][3]-wmat1[1][3])/(wmat3[0][3]-wmat1[0][3]) << " " << (wmat3[2][3]-wmat1[2][3])/(wmat3[0][3]-wmat1[0][3]) << endl;
+		
+		//cout << "FINGER: " << object[3].trans[0][3] << " " << object[3].trans[1][3] << " " << object[3].trans[2][3] << endl;
+
+		//findPos(paddlePos, object[2].trans, object[0].trans);// object[2].trans);
+
+		float x1,y1,z1;
+		float x2,y2,z2;
+		float dist;
+
+		x1 = object[0].trans[0][3];
+		y1 = object[0].trans[1][3];
+		z1 = object[0].trans[2][3];
+
+		x2 = object[3].trans[0][3];
+		y2 = object[3].trans[1][3];
+		z2 = object[3].trans[2][3];
+
+		// try finding touch point - not for capacitive though
+		if (y2 > 109 && z2 > 620 && !(_type == 'c')) { 
+			touch3 = true;
+			touch4 = false;
+		}
+		else if (y2 > 50 && z2 > 660 && !(_type == 'c')) {
+			touch3 = false; 
+			touch4 = true;
+		}
+			
+		//cout << "DISTANCE: " << dist << " " << object[0].marker_width << endl;
+	}
+	else {
+		touch3 = false;
+		touch4 = false;
+	}
+	
 
 	// object 2 - chooser
 	if (object[1].visible) {
@@ -456,7 +522,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glVertex3f(size, size, 0.0);
 			glVertex3f(-size, size, 0.0);
 		glEnd();*/
-		glutSolidCube(30.0);
+		//glutSolidCube(30.0);
 	}
 
 	// First object
@@ -508,6 +574,24 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glVertex3f(-screensize * 0.33, -screensize * 0.33, depth + 0.5);
 		glEnd();
 	}
+	if (touch2) { // show on the screen where it touched
+		glColor3f(1.0, 1.0, 1.0);
+		glBegin(GL_POINTS);
+			glVertex3f(-screensize * 0.33, screensize * 0.33, depth + 0.5);
+		glEnd();
+	}
+	if (touch3) { // show on the screen where it touched
+		glColor3f(1.0, 1.0, 1.0);
+		glBegin(GL_POINTS);
+			glVertex3f(screensize * 0.33, -screensize * 0.33, depth + 0.5);
+		glEnd();
+	}
+	if (touch4) { // show on the screen where it touched
+		glColor3f(1.0, 1.0, 1.0);
+		glBegin(GL_POINTS);
+			glVertex3f(screensize * 0.33, screensize * 0.33, depth + 0.5);
+		glEnd();
+	}
 
 	// Now draw the touch screen
 	// first rotate and translate
@@ -541,7 +625,11 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		for (int i = 0; i < 4; i++) {
 			glBegin(GL_LINE_STRIP);
 				for (int j = 0; j < 4; j++)
-					if (j == 1 && i == 1 && touch) {
+					if (j == 2 && i == 1 && touch3) {
+						glColor4f(0.0, 0.3, 0.3, 0.9);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 10);
+					}
+					else if (j == 2 && i == 2 && touch4) {
 						glColor4f(0.0, 0.3, 0.3, 0.9);
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 10);
 					}
@@ -555,9 +643,13 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		for (int j = 0; j < 4; j++) {
 			glBegin(GL_LINE_STRIP);
 				for (int i = 0; i < 4; i++)
-					if (j == 1 && i == 1 && touch) {
+					if (j == 2 && i == 1 && touch3) {
 						glColor4f(0.0, 0.3, 0.3, 0.9);
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 5);
+					}
+					else if (j == 2 && i == 2 && touch4) {
+						glColor4f(0.0, 0.3, 0.3, 0.9);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 10);
 					}
 					else {
 						glColor4f(0.0, 0.7, 0.7, 0.8);
@@ -604,6 +696,8 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 				for (int j = 0; j < 4; j++)
 					if (j == 1 && i == 1 && touch)
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
+					else if (j == 1 && i == 2 && touch2)
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
 					else
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
 		glEnd();
@@ -634,6 +728,10 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 						glColor3f(0.3, 0.3, 0.0);
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
 					}
+					if (j == 1 && i == 2 && touch2) {
+						glColor3f(0.3, 0.3, 0.0);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
+					}
 					else {
 						int random = (rand()%3);
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] + random);
@@ -650,6 +748,10 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 						glColor3f(0.3, 0.3, 0.0);
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
 					}
+					else if (j == 1 && i == 2 && touch2) {
+						glColor3f(0.3, 0.3, 0.0);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
+					}
 					else {
 						int random = (rand()%3);
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] + random);
@@ -661,6 +763,22 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		// reset blending
 		glDisable(GL_BLEND);
 		glEnable(GL_DEPTH_TEST);
+
+		// electron effect 
+		if (touch || touch2) {
+			glPushMatrix();
+				glLoadMatrixd(gl_para3);
+				glColor3f(1.0, 1.0, 0.0);
+				glPointSize(10.0);
+				glBegin(GL_POINTS);
+					glVertex3f(-time,0, -10.0);
+					glVertex3f(-(time-7), 0, -10);
+				glEnd();
+				time++;
+				if (time > 30)
+					time = 0;
+			glPopMatrix();
+		}
 	}
 	else { // infrared
 		// draw the emitters/receivers
