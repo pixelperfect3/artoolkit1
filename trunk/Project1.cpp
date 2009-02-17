@@ -23,6 +23,7 @@
 #include <AR/param.h>
 #include <AR/ar.h>
 #include <AR/video.h>
+#include <AR/matrix.h>
 
 #include "object.h"
 
@@ -45,6 +46,9 @@ double  wmat1[3][4], wmat2[3][4], wmat3[3][4];
 // prev positions
 double prev1[3][4], prev2[3][4], prev3[3][4];
 
+// if something touched pos: [1,1]
+int touch = 0;
+
 // the grids
 double cap[4][4][3];
 
@@ -56,6 +60,8 @@ float screensize = 50;
 
 // the type of touchscreen
 char _type = 'r'; // default = resistive
+
+float paddlePos[3];
 
 /* set up the video format globals */
 
@@ -75,6 +81,55 @@ static void   mainLoop(void);
 static int draw( ObjectData_T *object, int objectnum );
 static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_para3[16]);
 static int  draw_object( int obj_id, double gl_para[16] );
+
+/* find the position of the paddle card relative to the base and set the dropped blob position to this */
+static void	findPos(float curPaddlePos[], double card_trans[3][4],double base_trans[3][4])
+{
+	int i,j;
+
+	ARMat   *mat_a,  *mat_b, *mat_c;
+    double  x, y, z;
+
+	/*get card position relative to base pattern */
+    mat_a = arMatrixAlloc( 4, 4 );
+    mat_b = arMatrixAlloc( 4, 4 );
+    mat_c = arMatrixAlloc( 4, 4 );
+    for( j = 0; j < 3; j++ ) {
+        for( i = 0; i < 4; i++ ) {
+            mat_b->m[j*4+i] = base_trans[j][i];
+        }
+    }
+    mat_b->m[3*4+0] = 0.0;
+    mat_b->m[3*4+1] = 0.0;
+    mat_b->m[3*4+2] = 0.0;
+    mat_b->m[3*4+3] = 1.0;
+    for( j = 0; j < 3; j++ ) {
+        for( i = 0; i < 4; i++ ) {
+            mat_a->m[j*4+i] = card_trans[j][i];
+        }
+    }
+    mat_a->m[3*4+0] = 0.0;
+    mat_a->m[3*4+1] = 0.0;
+    mat_a->m[3*4+2] = 0.0;
+    mat_a->m[3*4+3] = 1.0;
+    arMatrixSelfInv( mat_b );
+    arMatrixMul( mat_c, mat_b, mat_a );
+
+	//x,y,z is card position relative to base pattern
+    x = mat_c->m[0*4+3];
+    y = mat_c->m[1*4+3];
+    z = mat_c->m[2*4+3];
+    
+	curPaddlePos[0] = x;
+	curPaddlePos[1] = y;
+	curPaddlePos[2] = z;
+
+    //printf("Position: %3.2f %3.2f %3.2f\n",x/(card_trans[0][3]-base_trans[0][3]),-y/card_trans[1][3],z/card_trans[2][3]);
+    printf("Position: %3.2f %3.2f %3.2f\n",x,-y,z);
+    arMatrixFree( mat_a );
+    arMatrixFree( mat_b );
+    arMatrixFree( mat_c );
+}
 
 int main(int argc, char **argv)
 {
@@ -98,6 +153,8 @@ static void   keyEvent( unsigned char key, int x, int y)
         cleanup();
         exit(0);
     }
+	else if (key == 't')
+		touch = !touch;
 }
 
 /* main loop */
@@ -283,18 +340,36 @@ static int draw( ObjectData_T *object, int objectnum )
 	// if finger and screen are visible
 	if (object[0].visible && object[2].visible) {
 		arUtilMatInv(object[0].trans, wmat1);
-
+		arUtilMatInv(object[2].trans, wmat3);
 		// according to 3rd object
 		arUtilMatMul(wmat1, object[2].trans, wmat3);
 
-		cout << wmat3[0][3] << " " <<  wmat3[1][3] << " " << wmat3[2][3] << endl;
+		//cout << "FINGER: " << wmat3[0][3] << " " <<  wmat3[1][3] << " " << wmat3[2][3] << endl;
+		//cout << "FINGER in relation to screen: " << (wmat3[0][3]-wmat1[0][3])/(wmat3[0][3]-wmat1[0][3]) << " " <<  (wmat3[1][3]-wmat1[1][3])/(wmat3[0][3]-wmat1[0][3]) << " " << (wmat3[2][3]-wmat1[2][3])/(wmat3[0][3]-wmat1[0][3]) << endl;
+		
+		findPos(paddlePos, object[2].trans, object[0].trans);// object[2].trans);
+
+		float x1,y1,z1;
+		float x2,y2,z2;
+		float dist;
+
+		x1 = object[0].trans[0][3];
+		y1 = object[0].trans[1][3];
+		z1 = object[0].trans[2][3];
+
+		x2 = object[2].trans[0][3];
+		y2 = object[2].trans[1][3];
+		z2 = object[2].trans[2][3];
+
+		dist = (x1-x2)*(x1-x2)+(y1-y2)*(y1-y2)+(z1-z2)*(z1-z2);
+		cout << "DISTANCE: " << dist << " " << object[0].marker_width << endl;
 	}
 
 	// object 2 - chooser
 	if (object[1].visible) {
 		arUtilMatInv(object[1].trans, wmat2);
 
-		cout << wmat2[0][3] << " " <<  wmat2[1][3] << " " << wmat2[2][3] << endl;
+		//cout << "CHOOSER: " << wmat2[0][3] << " " <<  wmat2[1][3] << " " << wmat2[2][3] << endl;
 
 		// now change the touchscreen type
 		if (wmat2[2][3] >= 690) 
@@ -372,8 +447,8 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		glDisable(GL_LIGHTING);
 		glLoadIdentity();
 		glLoadMatrixd( gl_para1 ); // should be para_3
-		glTranslatef(wmat3[0][3],wmat3[1][3],wmat3[2][3]);
-		
+		//glTranslatef(wmat3[0][3],wmat3[1][3],wmat3[2][3]);
+		glTranslatef(-paddlePos[0],-paddlePos[1],-paddlePos[2]);
 		float size = 10.0;
 		/*glBegin(GL_QUADS); // the top-screen
 			glVertex3f(-size, -size, 0.0);
@@ -427,6 +502,13 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		glVertex3f(-screensize, -screensize, depth);
 	glEnd();
 
+	if (touch) { // show on the screen where it touched
+		glColor3f(1.0, 1.0, 1.0);
+		glBegin(GL_POINTS);
+			glVertex3f(-screensize * 0.33, -screensize * 0.33, depth + 0.5);
+		glEnd();
+	}
+
 	// Now draw the touch screen
 	// first rotate and translate
 	glRotatef(50, -1.0, 0.0, 0.0);
@@ -441,7 +523,6 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glVertex3f(screensize, screensize, 0.0);
 			glVertex3f(-screensize, screensize, 0.0);
 		glEnd();*/
-
 		// draw the vertices
 		glColor3f(1.0, 1.0, 0.0);
 		glBegin(GL_POINTS);
@@ -460,14 +541,28 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		for (int i = 0; i < 4; i++) {
 			glBegin(GL_LINE_STRIP);
 				for (int j = 0; j < 4; j++)
-					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
+					if (j == 1 && i == 1 && touch) {
+						glColor4f(0.0, 0.3, 0.3, 0.9);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 10);
+					}
+					else {
+						glColor4f(0.0, 0.7, 0.7, 0.8);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
+					}
 			glEnd();
 		}
 		// the other way
 		for (int j = 0; j < 4; j++) {
 			glBegin(GL_LINE_STRIP);
 				for (int i = 0; i < 4; i++)
-					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
+					if (j == 1 && i == 1 && touch) {
+						glColor4f(0.0, 0.3, 0.3, 0.9);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 5);
+					}
+					else {
+						glColor4f(0.0, 0.7, 0.7, 0.8);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
+					}
 			glEnd();
 		}
 
@@ -507,7 +602,10 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		glBegin(GL_POINTS);
 			for (int i = 0; i < 4; i++)
 				for (int j = 0; j < 4; j++)
-					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
+					if (j == 1 && i == 1 && touch)
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
+					else
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
 		glEnd();
 
 		// draw the circuits at the corner
@@ -532,7 +630,14 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glBegin(GL_LINE_STRIP);
 				for (int j = 0; j < 4; j++) { 
 					int random = (rand()%3);
-					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] + random);
+					if (j == 1 && i == 1 && touch) {
+						glColor3f(0.3, 0.3, 0.0);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
+					}
+					else {
+						int random = (rand()%3);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] + random);
+					}
 				}
 			glEnd();
 		}
@@ -541,7 +646,14 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glBegin(GL_LINE_STRIP);
 				for (int i = 0; i < 4; i++) { 
 					int random = (rand()%3);
-					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] + random);
+					if (j == 1 && i == 1 && touch) {
+						glColor3f(0.3, 0.3, 0.0);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - 3);
+					}
+					else {
+						int random = (rand()%3);
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] + random);
+					}
 				}
 			glEnd();
 		}
@@ -568,6 +680,11 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glBegin(GL_LINE_STRIP);
 				float z = 0.0;
 				for (int j = 0; j < 4; j++) {
+					if (j == 1 && i == 1 && touch) {
+						// stop the strip. instead, draw a blob here
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
 					if (j % 2 == 1) // odd
 						z = 2.0;
 					else
@@ -581,6 +698,11 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glBegin(GL_LINE_STRIP);
 				float z = 0.0;
 				for (int i = 0; i < 4; i++) {
+					if (j == 1 && i == 1 && touch) {
+						// stop the strip. instead, draw a blob here
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
 					if (j % 2 == 1) // odd
 						z = 2.0;
 					else
@@ -588,6 +710,15 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
 				}
 			glEnd();
+		}
+		if (touch) {
+			glPushMatrix();
+						glPointSize(15.0);
+						glColor3f(0.5, 0.0, 0.0);
+						glBegin(GL_POINTS);
+							glVertex3f(cap[1][1][0],cap[1][1][1],cap[1][1][2]);
+						glEnd();
+						glPopMatrix();
 		}
 		
 		// draw the acrylic sheets
@@ -624,6 +755,25 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		// reset blending
 		glDisable(GL_BLEND);
 		glEnable(GL_DEPTH_TEST);
+
+		// draw the camera watching it?
+		//glEnable(GL_LIGHTING);
+		glTranslatef(50, 60, -70.0);
+		glColor3f(0.8, 0.8, 0.8);
+		glutSolidSphere(10.0, 40, 40);
+		glColor3f(0.5, 0.5, 0.5);
+		glPointSize(12.0);
+		glBegin(GL_POINTS);
+			glVertex3f(0.0, 0.0, 10.0);
+		glEnd();
+		/*glBegin(GL_QUADS);
+		
+		float camsize = 10.0;
+			glVertex3f(-camsize,camsize,0);
+			glVertex3f(camsize,camsize,0);
+			glVertex3f(camsize,-camsize,0);
+			glVertex3f(-camsize,-camsize,0);
+		glEnd();*/
 
 	} // end of infrared
 	glPopMatrix();
