@@ -405,7 +405,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 	glPushMatrix();
 
 	// for debugging purposes, draw an axes
-	drawAxes();
+	//drawAxes();
 
 	glColor3f(0.1, 0.1, 0.1);
 	glPointSize(6.0);
@@ -551,8 +551,81 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		glEnable(GL_DEPTH_TEST);
 	}
 	else { // infrared
-	
-	}
+		// draw the emitters/receivers
+		glPointSize(10.0);
+		glColor3f(1.0, 1.0, 0.0);
+		glBegin(GL_POINTS);
+			for (int i = 0; i < 1; i++) // left line
+				for (int j = 0; j < 4; j++)
+					glVertex3f(cap[i][j][0],cap[i][j][1] - 5,cap[i][j][2]);
+			for (int j = 0; j < 1; j++) // top/bottom line
+				for (int i = 0; i < 4; i++)
+					glVertex3f(cap[i][j][0] - 5,cap[i][j][1],cap[i][j][2]);
+		glEnd();
+		// now draw the red strips representing IR 
+		glColor3f(1.0, 0.0, 0.0);
+		for (int i = 0; i < 4; i++) {
+			glBegin(GL_LINE_STRIP);
+				float z = 0.0;
+				for (int j = 0; j < 4; j++) {
+					if (j % 2 == 1) // odd
+						z = 2.0;
+					else
+						z = 0.0;
+					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+				}
+			glEnd();
+		}
+		// the other way
+		for (int j = 0; j < 4; j++) {
+			glBegin(GL_LINE_STRIP);
+				float z = 0.0;
+				for (int i = 0; i < 4; i++) {
+					if (j % 2 == 1) // odd
+						z = 2.0;
+					else
+						z = 0.0;
+					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+				}
+			glEnd();
+		}
+		
+		// draw the acrylic sheets
+		// draw the lower material
+		glPushMatrix();
+
+		// try blending
+		glEnable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+		glTranslatef(0.0, 0.0, -5.0);
+		glColor4f(0.4, 0.4, 0.4, 0.4);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+		glBegin(GL_QUADS);
+			glVertex3f(cap[0][0][0],cap[0][0][1],cap[0][0][2]);
+			glVertex3f(cap[3][0][0],cap[3][0][1],cap[3][0][2]);
+			glVertex3f(cap[3][3][0],cap[3][3][1],cap[3][3][2]);
+			glVertex3f(cap[0][3][0],cap[0][3][1],cap[0][3][2]);
+		glEnd();
+		glPopMatrix();
+
+		// draw the upper material
+		glPushMatrix();
+		glTranslatef(0.0, 0.0, 5.0);
+		glColor4f(0.4, 0.4, 0.4, 0.4);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+		glBegin(GL_QUADS);
+			glVertex3f(cap[0][0][0],cap[0][0][1],cap[0][0][2]);
+			glVertex3f(cap[3][0][0],cap[3][0][1],cap[3][0][2]);
+			glVertex3f(cap[3][3][0],cap[3][3][1],cap[3][3][2]);
+			glVertex3f(cap[0][3][0],cap[0][3][1],cap[0][3][2]);
+		glEnd();
+		glPopMatrix();
+
+		// reset blending
+		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
+
+	} // end of infrared
 	glPopMatrix();
 
 
