@@ -45,14 +45,17 @@ double  wmat1[3][4], wmat2[3][4], wmat3[3][4];
 // prev positions
 double prev1[3][4], prev2[3][4], prev3[3][4];
 
+// the grids
+double cap[4][4][3];
+
 // does previous exist or not?
 bool prev = false;
 
 // screensize 
-float screensize = 55;
+float screensize = 50;
 
 // the type of touchscreen
-char _type = 'c'; // default = capacitive
+char _type = 'r'; // default = resistive
 
 /* set up the video format globals */
 
@@ -213,6 +216,43 @@ static void cleanup(void)
     argCleanup();
 }
 
+
+/* initializes the grids */
+static void initGrids() {
+
+	/* /-/-/-/-/
+	   /-/-/-/-/
+	   /-/-/-/-/
+	   /-/-/-/-/
+	   /-/-/-/-/  */
+	// first column
+
+	float first = 1.0/3; float second = 2.0/3;
+	cap[0][0][0] = 0; cap[0][0][1] = 0;								   cap[0][0][0] = 0;
+	cap[1][0][0] = 0; cap[1][0][1] = (screensize + screensize) * first; cap[1][0][0] = 0;
+	cap[2][0][0] = 0; cap[2][0][1] = (screensize + screensize) * second; cap[2][0][0] = 0;
+	cap[3][0][0] = 0; cap[3][0][1] = (screensize + screensize)       ; cap[3][0][0] = 0;
+
+	// 2nd column
+	cap[0][1][0] = (screensize + screensize) * first; cap[0][1][1] = 0;								  cap[0][1][2] = 0;
+	cap[1][1][0] = (screensize + screensize) * first; cap[1][1][1] = (screensize + screensize) * first; cap[1][1][2] = 0;
+	cap[2][1][0] = (screensize + screensize) * first; cap[2][1][1] = (screensize + screensize) * second; cap[2][1][2] = 0;
+	cap[3][1][0] = (screensize + screensize) * first; cap[3][1][1] = (screensize + screensize)       ; cap[3][1][2] = 0;
+
+	// 3rd column
+	cap[0][2][0] = (screensize + screensize) * second; cap[0][2][1] = 0;								  cap[0][2][2] = 0;
+	cap[1][2][0] = (screensize + screensize) * second; cap[1][2][1] = (screensize + screensize) * first; cap[1][2][2] = 0;
+	cap[2][2][0] = (screensize + screensize) * second; cap[2][2][1] = (screensize + screensize) * second; cap[2][2][2] = 0;
+	cap[3][2][0] = (screensize + screensize) * second; cap[3][2][1] = (screensize + screensize)       ; cap[3][2][2] = 0;
+
+	// 4th column
+	cap[0][3][0] = (screensize + screensize); cap[0][3][1] = 0;								   cap[0][3][2] = 0;
+	cap[1][3][0] = (screensize + screensize); cap[1][3][1] = (screensize + screensize) * first; cap[1][3][2] = 0;
+	cap[2][3][0] = (screensize + screensize); cap[2][3][1] = (screensize + screensize) * second; cap[2][3][2] = 0;
+	cap[3][3][0] = (screensize + screensize); cap[3][3][1] = (screensize + screensize)       ; cap[3][3][2] = 0;
+}
+
+
 /* draw the the AR objects */
 static int draw( ObjectData_T *object, int objectnum )
 {
@@ -237,6 +277,9 @@ static int draw( ObjectData_T *object, int objectnum )
 		cout << "detected all 3" << endl;
 	}*/
 
+	// initialize grids
+	initGrids();
+
 	// if finger and screen are visible
 	if (object[0].visible && object[2].visible) {
 		arUtilMatInv(object[0].trans, wmat1);
@@ -255,9 +298,9 @@ static int draw( ObjectData_T *object, int objectnum )
 
 		// now change the touchscreen type
 		if (wmat2[2][3] >= 690) 
-			_type = 'c';
-		else if (wmat2[2][3] >= 630)
 			_type = 'r';
+		else if (wmat2[2][3] >= 630)
+			_type = 'c';
 		else
 			_type = 'i';
 	}
@@ -365,7 +408,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 	drawAxes();
 
 	glColor3f(0.1, 0.1, 0.1);
-	glPointSize(10.0);
+	glPointSize(6.0);
 	glBegin(GL_QUADS); // the top-screen
 		glVertex3f(-screensize, -screensize, 0.0);
 		glVertex3f(screensize, -screensize, 0.0);
@@ -374,7 +417,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 	glEnd();
 	// the border for the screen
 	float depth = 0.2;
-	glColor3f(0.0, 0.0, 0.8);
+	glColor3f(0.5, 0.5, 0.5);
 	glBegin(GL_LINE_STRIP); // the top-screen
 		glVertex3f(-screensize, -screensize, depth);
 		glVertex3f(screensize, -screensize, depth);
@@ -386,18 +429,71 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 
 	// Now draw the touch screen
 	// first rotate and translate
-	glTranslatef(0.0, -screensize - 50.0, 45.0);
 	glRotatef(50, -1.0, 0.0, 0.0);
-	//glTranslatef(0.0, -50.0, 0.0);
-	if (_type == 'c') { // capacitive
-		glBegin(GL_QUADS); // the top-screen
+	glTranslatef(-screensize, -screensize, 0.0);
+	glTranslatef(-0.0, -55 - 45, 0.0);
+	glTranslatef(0.0, 0.0, -40);
+
+	if (_type == 'r') { // resistive
+		/*glBegin(GL_QUADS);
 			glVertex3f(-screensize, -screensize, 0.0);
 			glVertex3f(screensize, -screensize, 0.0);
 			glVertex3f(screensize, screensize, 0.0);
 			glVertex3f(-screensize, screensize, 0.0);
+		glEnd();*/
+
+		// draw the vertices
+		glColor3f(1.0, 1.0, 0.0);
+		glBegin(GL_POINTS);
+			for (int i = 0; i < 4; i++)
+				for (int j = 0; j < 4; j++)
+					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
 		glEnd();
-	} else if (_type == 'r') { // resistive
-	
+		// now draw the blue line strips representing electricity
+		glColor3f(0.0, 0.7, 0.7);
+		// try blending
+		glEnable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+
+		glColor4f(0.0, 0.7, 0.7, 0.8);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+		for (int i = 0; i < 4; i++) {
+			glBegin(GL_LINE_STRIP);
+				for (int j = 0; j < 4; j++)
+					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
+			glEnd();
+		}
+		// the other way
+		for (int j = 0; j < 4; j++) {
+			glBegin(GL_LINE_STRIP);
+				for (int i = 0; i < 4; i++)
+					glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2]);
+			glEnd();
+		}
+
+		// draw the lower material
+		glPushMatrix();
+
+		// try blending
+		glEnable(GL_BLEND);
+		glDisable(GL_DEPTH_TEST);
+
+		glColor4f(0.5, 0.5, 0.5, 0.7);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+		glBegin(GL_QUADS);
+			glVertex3f(cap[0][0][0],cap[0][0][1],cap[0][0][2]);
+			glVertex3f(cap[3][0][0],cap[3][0][1],cap[3][0][2]);
+			glVertex3f(cap[3][3][0],cap[3][3][1],cap[3][3][2]);
+			glVertex3f(cap[0][3][0],cap[0][3][1],cap[0][3][2]);
+		glEnd();
+		glPopMatrix();
+
+		// reset blending
+		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
+
+	} else if (_type == 'c') { // capacitive
+		
 	}
 	else { // infrared
 	
@@ -429,14 +525,14 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 		glColor3f(1.0, 0.0, 0.0);
 		float size = 20.0;
 		if (_type == 'c') { // capacitive
-			glBegin(GL_LINE_STRIP); // the top-screen
+			glBegin(GL_LINE_STRIP);
 				glVertex3f(size, size, 0.0);
 				glVertex3f(-size, size, 0.0);
 				glVertex3f(-size, -size, 0.0);
 				glVertex3f(size, -size, 0.0);
 			glEnd();
 		} else if (_type == 'r') { // resistive
-			glBegin(GL_LINE_STRIP); // the top-screen
+			glBegin(GL_LINE_STRIP);
 				glVertex3f(-size, -size, 0.0);
 				glVertex3f(-size, size, 0.0);
 				glVertex3f(size, size, 0.0);
@@ -450,7 +546,7 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 			glEnd();
 		}
 		else { // infrared
-			glBegin(GL_LINES); // the top-screen
+			glBegin(GL_LINES);
 				glVertex3f(-size, size, 0.0);
 				glVertex3f(size, size, 0.0);
 
@@ -465,7 +561,6 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 	//glutSolidCube(50.0);
 
 	
-
 	argDrawMode2D();
 }
 
