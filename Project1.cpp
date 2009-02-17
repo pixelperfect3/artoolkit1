@@ -771,8 +771,8 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 				glColor3f(1.0, 1.0, 0.0);
 				glPointSize(10.0);
 				glBegin(GL_POINTS);
-					glVertex3f(-time,0, -10.0);
-					glVertex3f(-(time-7), 0, -10);
+					glVertex3f(time,0, -10.0);
+					glVertex3f((time-7), 0, -10);
 				glEnd();
 				time++;
 				if (time > 30)
@@ -803,6 +803,18 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
 						break;
 					}
+					if (j == 1 && i == 2 && touch2) {
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
+					if (j == 2 && i == 1 && touch3) {
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
+					if (j == 2 && i == 2 && touch4) {
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
 					if (j % 2 == 1) // odd
 						z = 2.0;
 					else
@@ -818,6 +830,18 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 				for (int i = 0; i < 4; i++) {
 					if (j == 1 && i == 1 && touch) {
 						// stop the strip. instead, draw a blob here
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
+					if (j == 1 && i == 2 && touch2) {
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
+					if (j == 2 && i == 1 && touch3) {
+						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
+						break;
+					}
+					if (j == 2 && i == 2 && touch4) {
 						glVertex3f(cap[i][j][0],cap[i][j][1],cap[i][j][2] - z);
 						break;
 					}
