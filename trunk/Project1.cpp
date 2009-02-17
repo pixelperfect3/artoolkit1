@@ -237,6 +237,31 @@ static int draw( ObjectData_T *object, int objectnum )
 		cout << "detected all 3" << endl;
 	}*/
 
+	// if finger and screen are visible
+	if (object[0].visible && object[2].visible) {
+		arUtilMatInv(object[0].trans, wmat1);
+
+		// according to 3rd object
+		arUtilMatMul(wmat1, object[2].trans, wmat3);
+
+		cout << wmat3[0][3] << " " <<  wmat3[1][3] << " " << wmat3[2][3] << endl;
+	}
+
+	// object 2 - chooser
+	if (object[1].visible) {
+		arUtilMatInv(object[1].trans, wmat2);
+
+		cout << wmat2[0][3] << " " <<  wmat2[1][3] << " " << wmat2[2][3] << endl;
+
+		// now change the touchscreen type
+		if (wmat2[2][3] >= 690) 
+			_type = 'c';
+		else if (wmat2[2][3] >= 630)
+			_type = 'r';
+		else
+			_type = 'i';
+	}
+	
 	glClearDepth( 1.0 );
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -303,16 +328,17 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 	if (object[2].visible) {
 		glDisable(GL_LIGHTING);
 		glLoadIdentity();
-		glLoadMatrixd( gl_para3 );
-		glTranslatef(0.0, 0.0, 30.0);
+		glLoadMatrixd( gl_para1 ); // should be para_3
+		glTranslatef(wmat3[0][3],wmat3[1][3],wmat3[2][3]);
 		
 		float size = 10.0;
-		glBegin(GL_QUADS); // the top-screen
+		/*glBegin(GL_QUADS); // the top-screen
 			glVertex3f(-size, -size, 0.0);
 			glVertex3f(size, -size, 0.0);
 			glVertex3f(size, size, 0.0);
 			glVertex3f(-size, size, 0.0);
-		glEnd();
+		glEnd();*/
+		glutSolidCube(30.0);
 	}
 
 	// First object
@@ -379,11 +405,63 @@ static void drawTwoObjects(double gl_para1[16], double gl_para2[16], double gl_p
 	glPopMatrix();
 
 
-	// Second object
-	glEnable(GL_LIGHTING);
-	glLoadIdentity();
-    glLoadMatrixd( gl_para2 );
-	glTranslatef(0.0, 0.0, 30.0);
+	// Second object - choosing touchscreen type
+	//glEnable(GL_LIGHTING);
+	if (object[1].visible) {
+		glLoadIdentity();
+		glLoadMatrixd( gl_para2 );
+
+		//cout << "GL_PARA2 " << gl_para2[4] << " " <<  gl_para2[8] << " " << gl_para2[2][3] << endl;
+
+		glTranslatef(0.0, 0.0, 30.0);
+		// draw a quad, and then over it the type
+		glColor3f(1.0, 1.0, 1.0);
+		float bgSize = 40.0;
+		glBegin(GL_QUADS);
+			glVertex3f(-bgSize, -bgSize, 0.0);
+			glVertex3f(bgSize, -bgSize, 0.0);
+			glVertex3f(bgSize, bgSize, 0.0);
+			glVertex3f(-bgSize, bgSize, 0.0);
+		glEnd();
+
+		// draw character depending on the touchscreen type
+		glTranslatef(0.0, 0.0, 2.0);
+		glColor3f(1.0, 0.0, 0.0);
+		float size = 20.0;
+		if (_type == 'c') { // capacitive
+			glBegin(GL_LINE_STRIP); // the top-screen
+				glVertex3f(size, size, 0.0);
+				glVertex3f(-size, size, 0.0);
+				glVertex3f(-size, -size, 0.0);
+				glVertex3f(size, -size, 0.0);
+			glEnd();
+		} else if (_type == 'r') { // resistive
+			glBegin(GL_LINE_STRIP); // the top-screen
+				glVertex3f(-size, -size, 0.0);
+				glVertex3f(-size, size, 0.0);
+				glVertex3f(size, size, 0.0);
+				glVertex3f(size, 0, 0.0);
+				glVertex3f(-size, 0, 0.0);
+			glEnd();
+
+			glBegin(GL_LINES);
+				glVertex3f(size * 0.45, 0.0, 0.0);
+				glVertex3f(size, -size, 0.0);
+			glEnd();
+		}
+		else { // infrared
+			glBegin(GL_LINES); // the top-screen
+				glVertex3f(-size, size, 0.0);
+				glVertex3f(size, size, 0.0);
+
+				glVertex3f(0.0, size, 0.0);
+				glVertex3f(0.0, -size, 0.0);
+
+				glVertex3f(-size, -size, 0.0);
+				glVertex3f(size, -size, 0.0);
+			glEnd();
+		}
+	}
 	//glutSolidCube(50.0);
 
 	
